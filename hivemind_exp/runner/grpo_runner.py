@@ -32,7 +32,7 @@ class GRPOArguments:
     number_of_data_samples: int = 50000
     public_maddr: str | None = None
 
-    #Hugging Face Hub arguments
+    # Hugging Face Hub arguments
     hf_token: str | None = None
 
 
@@ -41,7 +41,7 @@ class GRPORunner:
         model_init_kwargs = args.model_init_kwargs or {}
         # Disable caching if gradient checkpointing is enabled (not supported)
         model_init_kwargs["use_cache"] = (
-            False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
+            False if getattr(args, "gradient_checkpointing", False) else model_init_kwargs.get("use_cache", True)
         )
         return AutoModelForCausalLM.from_pretrained(model_name, **model_init_kwargs)
 
@@ -97,17 +97,38 @@ class GRPORunner:
         #########################
         # Log parameters
         #########################
-        logger.debug(f"Model parameters {model_args}")
-        logger.debug(f"Training/evaluation parameters {training_args}")
+        logger.debug(f"Model parameters: {model_args}")
+        logger.debug(f"Training/evaluation parameters: {training_args}")
 
-        batch_size = 2
-        training_args.per_device_train_batch_size = batch_size
-        training_args.num_generations = batch_size
+        #########################
+        # Modify training hyperparameters for speed/accuracy
+        #########################
+        # Increase the effective batch size and adjust generation count:
+        new_batch_size = 4  # Increase from 2 to 4
+        training_args.per_device_train_batch_size = new_batch_size
+        training_args.num_generations = new_batch_size
+
+        # Increase training duration to allow better convergence
+        training_args.max_steps = 1000  # Increased from a lower default value
+
+        # Reduce logging and checkpoint frequency to reduce I/O overhead
+        training_args.logging_steps = 10
+        training_args.save_steps = 100
+
+        # Adjust the learning rate and warmup ratio for smoother training
+        if hasattr(training_args, "learning_rate"):
+            training_args.learning_rate = 1.0e-6
+        if hasattr(training_args, "warmup_ratio"):
+            training_args.warmup_ratio = 0.05
+
+        # Disable gradient checkpointing if present to avoid recomputation overhead
+        if hasattr(training_args, "gradient_checkpointing"):
+            training_args.gradient_checkpointing = False
 
         ############################
-        # Log into HF hub if wanted
+        # Log into HF hub if credentials provided
         ############################
-        if (grpo_args.hf_token not in [None, "None"]):
+        if grpo_args.hf_token not in [None, "None"]:
             training_args.push_to_hub_token = grpo_args.hf_token
             login(token=training_args.push_to_hub_token, add_to_git_credential=True)
         else:
@@ -135,20 +156,23 @@ class GRPORunner:
         train_dataset, test_dataset = initial_datasets_fn()
 
         #########################
-        # Instantiate DPO trainer
+        # Instantiate model and node
         #########################
         model_name_or_path = model_args.model_name_or_path
-        assert model_name_or_path
+        assert model_name_or_path, "Model name or path must be provided."
         model = self.get_model(training_args, model_name_or_path)
 
-        initial_peers = grpo_args.initial_peers
-        if initial_peers:
+        if grpo_args.initial_peers:
             node = HivemindNode(model_name_or_path, str(dht.peer_id))
         else:
             node = HivemindNode.coordinator(model_name_or_path, str(dht.peer_id))
 
         stage_data = gsm8k_stage_data(dht, node, train_dataset, test_dataset)
         stage_data.max_rounds = grpo_args.max_rounds
+
+        #########################
+        # Instantiate GRPO Trainer and start training
+        #########################
         trainer = trainer_factory_fn(
             dht=dht,
             node=node,
@@ -159,10 +183,8 @@ class GRPORunner:
             log_tag=self.name,
         )
 
-        ###############
-        # Training loop
-        ###############
         logger.info(
-            f"Starting training {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for {training_args.num_train_epochs} epochs"
+            f"Starting training at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+            f"for {training_args.num_train_epochs if hasattr(training_args, 'num_train_epochs') else 'N/A'} epochs"
         )
         trainer.train()

@@ -14,12 +14,9 @@ sudo apt install -y nodejs
 
 # Add Yarn GPG key & repository
 echo "==> Setting up Yarn keyring and repository..."
-sudo mkdir -p /etc/apt/keyrings
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
-  | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null
+curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
 
-echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" \
-  | sudo tee /etc/apt/sources.list.d/yarn.list
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list > /dev/null
 
 # Install Yarn
 sudo apt update
@@ -35,6 +32,9 @@ else
   git clone https://github.com/gensyn-ai/rl-swarm.git
   cd rl-swarm
 fi
+
+echo "==> Please import your swarn.pem file now."
+sleep 15
 
 # Set up Python virtual environment
 echo "==> Creating and activating Python venv..."

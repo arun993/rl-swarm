@@ -67,14 +67,22 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt update
 sudo apt install -y nodejs
 
-# Add Yarn GPG key & repository
+# Add Yarn GPG key & repository (with fallback)
 echo "==> Setting up Yarn keyring and repository..."
 sudo mkdir -p /etc/apt/keyrings
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
-  | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null
 
-echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" \
-  | sudo tee /etc/apt/sources.list.d/yarn.list
+if curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
+     | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null; then
+  echo "Primary keyring import succeeded."
+  echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/yarn.list
+else
+  echo "Primary import failed – falling back to legacy apt-key method."
+  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
+    | sudo apt-key add -
+  echo "deb https://dl.yarnpkg.com/debian/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/yarn.list > /dev/null
+fi
 
 # Install Yarn
 sudo apt update

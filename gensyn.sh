@@ -71,11 +71,10 @@ sudo apt install -y nodejs
 echo "==> Setting up Yarn keyring and repository..."
 sudo mkdir -p /etc/apt/keyrings
 
-if curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
-     | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null; then
+if curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null; then
   echo "Primary keyring import succeeded."
-  echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" \
-    | sudo tee /etc/apt/sources.list.d/yarn.list
+  echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" | \
+     sudo tee /etc/apt/sources.list.d/yarn.list
 else
   echo "Primary import failed – falling back to legacy apt-key method."
   curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \

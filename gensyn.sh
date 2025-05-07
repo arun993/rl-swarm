@@ -12,15 +12,27 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt update
 sudo apt install -y nodejs
 
-# Add Yarn GPG key & repository
+# Add Yarn GPG key & repository (with dearmor + fallback)
 echo "==> Setting up Yarn keyring and repository..."
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+sudo mkdir -p /etc/apt/keyrings
 
-echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list > /dev/null
+if curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
+     | gpg --dearmor \
+     | sudo tee /etc/apt/keyrings/yarn.gpg > /dev/null; then
+  echo "Primary keyring import succeeded."
+  sudo chmod 644 /etc/apt/keyrings/yarn.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/yarn.list
+else
+  echo "Primary import failed – falling back to legacy apt-key method."
+  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+  echo "deb https://dl.yarnpkg.com/debian/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/yarn.list > /dev/null
+fi
 
-# Install Yarn
 sudo apt update
 sudo apt install -y --no-install-recommends yarn
+
 
 # Clone rl-swarm repo
 echo "==> Cloning rl-swarm repository..."

@@ -45,7 +45,7 @@ else
   cd rl-swarm
 fi
 
-echo -e "${BLUE}==> Please import your swarn.pem file now.${NC}"
+echo -e "${BLUE}==> Go to SFTP and import your swarn.pem file now.${NC}"
 sleep 15
 
 echo -e "${GREEN}==> Creating and activating Python venv...${NC}"
